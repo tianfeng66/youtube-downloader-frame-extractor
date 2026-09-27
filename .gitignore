@@ -1,0 +1,27 @@
+.venv/
+.bootstrap/
+__pycache__/
+config.json
+*.log
+.DS_Store
+
+# 打包产物
+*.zip
+
+# 下载和抽帧的产物：默认就存在本目录，绝不能提交
+*.mp4
+*.webm
+*.mkv
+*.m4a
+*.mp3
+*.part
+*.ytdl
+*.jpg
+*.jpeg
+*.png
+*.webp
+帧_*/
+frames_*/
+
+# 浏览器 Cookie 导出
+cookies*.txt

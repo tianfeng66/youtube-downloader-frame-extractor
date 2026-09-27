@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube 下载 + 抽帧</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --fg:#e8eaf0; --dim:#98a0b3; --accent:#ff3b30; --ok:#32d74b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:14px/1.6 -apple-system,"PingFang SC","Helvetica Neue",Arial,sans-serif;}
+  .wrap{max-width:940px;margin:0 auto;padding:26px 20px 60px}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+  .logo{width:38px;height:27px;background:var(--accent);border-radius:7px;position:relative;flex:none}
+  .logo::after{content:"";position:absolute;left:15px;top:8px;border-left:10px solid #fff;
+    border-top:5.5px solid transparent;border-bottom:5.5px solid transparent}
+  h1{font-size:19px;margin:0;font-weight:600}
+  .sub{color:var(--dim);font-size:12px}
+  .tabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--line)}
+  .tabs button{background:none;border:none;border-bottom:2px solid transparent;
+    color:var(--dim);padding:10px 18px;font-size:14px;cursor:pointer;border-radius:0}
+  .tabs button.on{color:var(--fg);border-bottom-color:var(--accent);font-weight:600}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+  .card h3{margin:0 0 14px;font-size:13px;color:var(--dim);font-weight:600;letter-spacing:.3px}
+  label.blk{display:block;font-size:12px;color:var(--dim);margin-bottom:6px}
+  textarea,input[type=text],input[type=number]{width:100%;background:var(--panel2);color:var(--fg);
+    border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:13px;resize:vertical}
+  textarea{min-height:82px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  textarea:focus,input:focus,select:focus{outline:none;border-color:#4a5468}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .grow{flex:1;min-width:170px}
+  button{background:var(--panel2);color:var(--fg);border:1px solid var(--line);
+    border-radius:9px;padding:10px 16px;font-size:13px;cursor:pointer;transition:.15s}
+  button:hover{background:#262b36;border-color:#3d4456}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;padding:10px 26px}
+  button.primary:hover{background:#e0332a}
+  button.ghost{padding:8px 12px;font-size:12px}
+  select{background:var(--panel2);color:var(--fg);border:1px solid var(--line);
+    border-radius:9px;padding:10px 12px;font-size:13px;max-width:100%}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .chip{display:inline-flex;align-items:center;gap:7px;background:var(--panel2);
+    border:1px solid var(--line);border-radius:20px;padding:7px 14px;font-size:12.5px;cursor:pointer;user-select:none}
+  .chip input{accent-color:var(--accent);margin:0}
+  .chip.on{border-color:var(--accent);color:#fff}
+  .fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+  .fields label{font-size:12px;color:var(--dim)}
+  .fields label input,.fields label select{margin-top:5px}
+  .meta{display:flex;gap:14px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+  .meta img{width:150px;border-radius:8px;flex:none;object-fit:cover}
+  .meta h4{margin:0 0 5px;font-size:14.5px;font-weight:600}
+  .meta .d{color:var(--dim);font-size:12px}
+  .qbadge{display:inline-block;background:#2a2f3a;border-radius:5px;padding:2px 7px;
+    font-size:11px;margin:4px 4px 0 0;color:#cbd2e0}
+  .qbadge.hot{background:rgba(255,59,48,.18);color:#ff8b83}
+  .modetabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+  .modetabs button{font-size:12.5px;padding:8px 14px}
+  .modetabs button.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .est{color:var(--dim);font-size:12px;margin-top:12px}
+  .est b{color:var(--fg)}
+  .task{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-bottom:10px}
+  .task .t{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+  .task .name{font-size:13.5px;font-weight:500;word-break:break-all;flex:1}
+  .bar{height:6px;background:#22262f;border-radius:4px;margin-top:10px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--accent);border-radius:4px;transition:width .3s}
+  .task.done .bar i{background:var(--ok)}
+  .task.error .bar i{background:#5a5f6b}
+  .info{display:flex;gap:14px;color:var(--dim);font-size:11.5px;margin-top:7px;flex-wrap:wrap}
+  .st{font-size:11.5px;padding:3px 9px;border-radius:6px;background:#22262f;color:var(--dim);white-space:nowrap}
+  .st.running{background:rgba(255,59,48,.16);color:#ff7b73}
+  .st.done{background:rgba(50,215,75,.15);color:var(--ok)}
+  .st.error{background:rgba(255,69,58,.15);color:#ff6961}
+  .kind{font-size:10.5px;padding:2px 7px;border-radius:5px;background:#2a2f3a;color:var(--dim);margin-right:7px}
+  .err{color:#ff8b83;font-size:11.5px;margin-top:7px;word-break:break-all;
+    background:rgba(255,69,58,.07);padding:7px 9px;border-radius:7px;font-family:ui-monospace,Menlo,monospace}
+  .sechead{display:flex;justify-content:space-between;align-items:center;margin:22px 0 12px}
+  .sechead h2{font-size:14px;margin:0;font-weight:600;color:var(--dim)}
+  .empty{color:var(--dim);text-align:center;padding:26px;font-size:13px;
+    border:1px dashed var(--line);border-radius:11px}
+  .foot{color:var(--dim);font-size:11.5px;text-align:center;margin-top:28px;line-height:1.9}
+  details summary{cursor:pointer;color:var(--dim);font-size:12.5px}
+  details .body{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+  video{width:100%;max-height:380px;background:#000;border-radius:9px;display:block}
+  .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .fgrid a{display:block;border:1px solid var(--line);border-radius:8px;overflow:hidden;
+    background:var(--panel2);text-decoration:none}
+  .fgrid img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000}
+  .fgrid span{display:block;padding:5px 7px;font-size:10.5px;color:var(--dim);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#2b3140;
+    border:1px solid var(--line);padding:11px 20px;border-radius:10px;font-size:13px;
+    opacity:0;transition:.25s;pointer-events:none;z-index:9}
+  .toast.on{opacity:1;bottom:38px}
+  .hide{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"></div>
+    <div>
+      <h1>YouTube 下载 + 抽帧</h1>
+      <div class="sub" id="ver">加载中…</div>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="on" data-tab="download">下载视频</button>
+    <button data-tab="extract">视频抽帧</button>
+  </div>
+
+  <!-- ============ 下载 ============ -->
+  <div id="tab-download">
+    <div class="card">
+      <label class="blk">视频网址（可一次粘贴多条，每行一个）</label>
+      <textarea id="urls" placeholder="https://www.youtube.com/watch?v=..."></textarea>
+
+      <div class="row" style="margin-top:12px">
+        <select id="quality">
+          <option value="best">最高画质（自动，含 4K/8K）</option>
+          <option value="2160">4K / 2160p</option>
+          <option value="1440">2K / 1440p</option>
+          <option value="1080" selected>1080p</option>
+          <option value="720">720p</option>
+          <option value="480">480p（省流量）</option>
+          <option value="audio">仅音频</option>
+        </select>
+        <select id="audiofmt" class="hide">
+          <option value="mp3">MP3</option>
+          <option value="m4a">M4A（无损转封装，更快）</option>
+          <option value="wav">WAV</option>
+        </select>
+        <button class="primary" id="go">开始下载</button>
+        <button id="check">查看视频信息</button>
+      </div>
+
+      <div class="chips">
+        <label class="chip"><input type="checkbox" id="compat">兼容模式 H.264（Mac 直接播放/可剪辑）</label>
+        <label class="chip"><input type="checkbox" id="subs">下载字幕（中/英）</label>
+        <label class="chip"><input type="checkbox" id="thumb">保存封面图</label>
+        <label class="chip"><input type="checkbox" id="playlist">整个播放列表</label>
+      </div>
+
+      <details style="margin-top:14px">
+        <summary>高级设置（会员/年龄限制视频、代理、保存位置）</summary>
+        <div class="body">
+          <div>
+            <label class="blk">保存位置</label>
+            <div class="row">
+              <input type="text" id="dir" class="grow" readonly>
+              <button class="ghost" id="pick">选择文件夹</button>
+              <button class="ghost" id="open">打开</button>
+            </div>
+          </div>
+          <div>
+            <label class="blk">从浏览器读取 Cookie（用于会员、年龄限制、私享视频）</label>
+            <select id="cookies">
+              <option value="">不使用</option>
+              <option value="chrome">Chrome</option>
+              <option value="safari">Safari</option>
+              <option value="edge">Edge</option>
+              <option value="firefox">Firefox</option>
+              <option value="brave">Brave</option>
+            </select>
+          </div>
+          <div>
+            <label class="blk">代理（留空则直连，例：http://127.0.0.1:7890）</label>
+            <input type="text" id="proxy" placeholder="http://127.0.0.1:7890">
+          </div>
+        </div>
+      </details>
+
+      <div class="meta hide" id="meta">
+        <img id="mthumb" alt="">
+        <div>
+          <h4 id="mtitle"></h4>
+          <div class="d" id="mdesc"></div>
+          <div id="mq"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 抽帧 ============ -->
+  <div id="tab-extract" class="hide">
+    <div class="card">
+      <h3>1. 选择视频</h3>
+      <div class="row">
+        <select id="vsel" class="grow"><option value="">（没找到视频）</option></select>
+        <button class="ghost" id="vrefresh">刷新列表</button>
+        <button class="ghost" id="vpick">选其他文件…</button>
+      </div>
+      <div class="est" id="vinfo">从上面挑一个视频，或用「选其他文件」指定任意位置的视频。</div>
+      <details style="margin-top:12px" id="previewBox">
+        <summary>预览并手动截取某一帧</summary>
+        <div class="body">
+          <video id="player" controls preload="metadata" playsinline></video>
+          <div class="row">
+            <button class="ghost" id="stepBack">← 上一帧</button>
+            <button class="ghost" id="stepFwd">下一帧 →</button>
+            <button class="ghost" id="grabNow">截取当前帧</button>
+            <span class="est" id="curTime"></span>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h3>2. 抽帧设置</h3>
+      <div class="modetabs" id="modetabs">
+        <button class="on" data-mode="interval">按间隔</button>
+        <button data-mode="count">定帧数</button>
+        <button data-mode="fps">按 FPS</button>
+        <button data-mode="iframe">关键帧（I 帧）</button>
+      </div>
+
+      <div class="fields" id="m-interval">
+        <label>每隔（秒）<input type="number" id="intervalSec" value="1" min="0.1" step="0.1"></label>
+        <label>起始时间（秒）<input type="number" id="startSec" value="0" min="0" step="0.1"></label>
+      </div>
+      <div class="fields hide" id="m-count">
+        <label>总帧数<input type="number" id="frameCount" value="12" min="1" step="1"></label>
+        <label>包含首尾
+          <select id="includeEnds"><option value="0" selected>不包含（均匀分布）</option><option value="1">包含</option></select>
+        </label>
+      </div>
+      <div class="fields hide" id="m-fps">
+        <label>抽取 FPS<input type="number" id="extractFps" value="1" min="0.1" step="0.1"></label>
+        <label>起始时间（秒）<input type="number" id="fpsStartSec" value="0" min="0" step="0.1"></label>
+      </div>
+      <div class="fields hide" id="m-iframe">
+        <label>最小间隔（秒，0=全部 I 帧）<input type="number" id="iframeMinGap" value="0" min="0" step="0.1"></label>
+        <label>起始时间（秒）<input type="number" id="iframeStartSec" value="0" min="0" step="0.1"></label>
+      </div>
+
+      <div class="fields" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line)">
+        <label>结束时间（秒，空=到结尾）<input type="number" id="endSec" min="0" step="0.1" placeholder="整片"></label>
+        <label>输出格式
+          <select id="outFormat">
+            <option value="png" selected>PNG（无损，文件大）</option>
+            <option value="jpg">JPEG（体积小）</option>
+            <option value="webp">WebP</option>
+          </select>
+        </label>
+        <label>JPEG / WebP 质量（0.5–1）<input type="number" id="outQuality" value="0.92" min="0.5" max="1" step="0.01"></label>
+        <label>最长边（px，0=原尺寸）<input type="number" id="maxSide" value="0" min="0" step="1"></label>
+        <label>文件名前缀<input type="text" id="namePrefix" value="frame"></label>
+      </div>
+
+      <div class="chips">
+        <label class="chip"><input type="checkbox" id="tonemap" checked>HDR 转 SDR（HDR 片源必开，否则发灰）</label>
+        <label class="chip"><input type="checkbox" id="cleanOld" checked>抽帧前清掉上一轮同名文件</label>
+      </div>
+
+      <div class="row" style="margin-top:16px">
+        <button class="primary" id="extractBtn" disabled>开始抽帧</button>
+        <span class="est" id="est"></span>
+      </div>
+      <div class="est" id="outHint"></div>
+    </div>
+
+    <div class="card">
+      <div class="sechead" style="margin:0 0 12px">
+        <h3 style="margin:0">3. 帧预览</h3>
+        <div class="row" style="gap:8px">
+          <span class="est" id="fcount"></span>
+          <button class="ghost" id="openFrames" disabled>打开帧文件夹</button>
+        </div>
+      </div>
+      <div class="fgrid" id="fgrid"></div>
+      <div class="empty" id="fempty">抽帧结果会出现在这里</div>
+    </div>
+  </div>
+
+  <!-- ============ 任务列表（两个标签页共用） ============ -->
+  <div class="sechead">
+    <h2>任务</h2>
+    <button class="ghost" id="clear">清空已完成</button>
+  </div>
+  <div id="tasks"><div class="empty">还没有任务</div></div>
+
+  <div class="foot">
+    下载内容请仅用于个人学习与合理使用，遵守 YouTube 服务条款与版权规定。<br>
+    关闭这个页面不会停止任务；要完全退出请关掉启动它的终端窗口。
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let toastTimer;
+function toast(msg){
+  $('toast').textContent = msg;
+  $('toast').classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>$('toast').classList.remove('on'), 2800);
+}
+function post(path, body){
+  return fetch(path, {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body||{})}).then(r=>r.json());
+}
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,
+    c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtDur(s){
+  if(!s) return '';
+  s = Math.round(s);
+  const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60;
+  return (h? h+':'+String(m).padStart(2,'0') : m) + ':' + String(x).padStart(2,'0');
+}
+function fmtEta(s){
+  if(s < 60) return Math.round(s) + ' 秒';
+  if(s < 3600) return Math.round(s/60) + ' 分钟';
+  return (s/3600).toFixed(1) + ' 小时';
+}
+function fmtSize(n){
+  if(!n) return '';
+  const u = ['B','KB','MB','GB'];
+  let i = 0;
+  while(n >= 1024 && i < 3){ n /= 1024; i++; }
+  return n.toFixed(1) + u[i];
+}
+
+/* ---------------- 标签页 ---------------- */
+document.querySelectorAll('.tabs button').forEach(b=>{
+  b.onclick = () => {
+    document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on', x===b));
+    $('tab-download').classList.toggle('hide', b.dataset.tab !== 'download');
+    $('tab-extract').classList.toggle('hide', b.dataset.tab !== 'extract');
+    if(b.dataset.tab === 'extract' && !$('vsel').value) loadVideos();
+  };
+});
+function gotoExtract(path){
+  document.querySelector('.tabs button[data-tab=extract]').click();
+  loadVideos(path);
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+document.querySelectorAll('.chip input').forEach(cb=>{
+  const sync = () => cb.closest('.chip').classList.toggle('on', cb.checked);
+  cb.onchange = sync; sync();
+});
+
+/* ---------------- 下载 ---------------- */
+function dlOpts(){
+  return {
+    urls: $('urls').value, url: $('urls').value,
+    quality: $('quality').value, audio_format: $('audiofmt').value,
+    compat: $('compat').checked, subs: $('subs').checked, auto_subs: true,
+    thumbnail: $('thumb').checked, playlist: $('playlist').checked,
+    cookies_browser: $('cookies').value, proxy: $('proxy').value.trim()
+  };
+}
+$('quality').onchange = () => {
+  const audio = $('quality').value === 'audio';
+  $('audiofmt').classList.toggle('hide', !audio);
+  $('compat').closest('.chip').style.opacity = audio ? .4 : 1;
+};
+$('go').onclick = async () => {
+  if(!$('urls').value.trim()) return toast('先粘贴一个视频网址');
+  $('go').disabled = true;
+  const r = await post('/api/add', dlOpts());
+  $('go').disabled = false;
+  if(!r.ok) return toast('出错：' + r.error);
+  toast('已加入 ' + r.count + ' 个下载任务');
+  refresh();
+};
+$('check').onclick = async () => {
+  if(!$('urls').value.trim()) return toast('先粘贴一个视频网址');
+  $('check').disabled = true; $('check').textContent = '查询中…';
+  const r = await post('/api/probe', dlOpts());
+  $('check').disabled = false; $('check').textContent = '查看视频信息';
+  if(!r.ok){ $('meta').classList.add('hide'); return toast('查不到：' + r.error); }
+  $('meta').classList.remove('hide');
+  $('mthumb').src = r.thumbnail || '';
+  if(r.kind === 'playlist'){
+    $('mtitle').textContent = r.title;
+    $('mdesc').textContent = '播放列表，共 ' + r.count + ' 个视频（勾选「整个播放列表」可全部下载）';
+    $('mq').innerHTML = '';
+  } else {
+    $('mtitle').textContent = r.title;
+    $('mdesc').textContent = [r.uploader, fmtDur(r.duration)].filter(Boolean).join(' · ');
+    $('mq').innerHTML = (r.heights||[]).map(h=>
+      `<span class="qbadge${h>=2160?' hot':''}">${h}p</span>`).join('');
+  }
+};
+$('pick').onclick = async () => {
+  const r = await post('/api/pick_dir');
+  $('dir').value = r.output_dir;
+  toast('保存位置已更新');
+};
+$('open').onclick = () => post('/api/reveal', {});
+$('clear').onclick = async () => { await post('/api/clear'); refresh(); };
+
+/* ---------------- 抽帧 ---------------- */
+let curVideo = null;   // { path, duration, fps, width, height, hdr, ... }
+
+async function loadVideos(selectPath){
+  const r = await (await fetch('/api/videos')).json();
+  const list = r.videos || [];
+  const sel = $('vsel');
+  if(!list.length){
+    sel.innerHTML = '<option value="">（没找到视频，用「选其他文件」指定）</option>';
+    return;
+  }
+  sel.innerHTML = list.map(v=>
+    `<option value="${esc(v.path)}">${esc(v.name)}　—　${fmtSize(v.size)}</option>`).join('');
+  sel.value = (selectPath && list.some(v=>v.path===selectPath)) ? selectPath : list[0].path;
+  await pickVideo(sel.value);
+}
+
+async function pickVideo(path){
+  if(!path) return;
+  $('vinfo').textContent = '读取视频信息…';
+  const r = await post('/api/media_info', {path});
+  if(!r.ok){ $('vinfo').textContent = '读不出来：' + (r.error||'未知错误'); return; }
+  curVideo = r;
+  const bits = [
+    `${r.width}×${r.height}`,
+    fmtDur(r.duration),
+    `${r.fps} fps`,
+    r.vcodec,
+    fmtSize(r.size),
+    `${r.keyframes} 个 I 帧`
+  ];
+  if(r.hdr) bits.push('HDR（建议开色调映射）');
+  if(r.decode_fps) bits.push(`解码 ${r.decode_fps} 帧/秒`);
+  $('vinfo').innerHTML = bits.map(b=>`<span class="qbadge${b.startsWith('HDR')?' hot':''}">${esc(b)}</span>`).join('');
+  $('tonemap').checked = !!r.hdr;
+  $('tonemap').dispatchEvent(new Event('change'));
+  $('extractBtn').disabled = false;
+  $('outHint').textContent = '输出到：' + r.frames_dir;
+  $('player').src = '/media?path=' + encodeURIComponent(path);
+  estimate();
+  showFrames(r.frames_dir, true);
+}
+
+$('vsel').onchange = () => pickVideo($('vsel').value);
+$('vrefresh').onclick = () => loadVideos($('vsel').value);
+$('vpick').onclick = async () => {
+  const r = await post('/api/pick_video');
+  if(!r.ok || !r.path) return;
+  const sel = $('vsel');
+  if(![...sel.options].some(o=>o.value===r.path)){
+    sel.insertAdjacentHTML('afterbegin',
+      `<option value="${esc(r.path)}">${esc(r.path.split('/').pop())}</option>`);
+  }
+  sel.value = r.path;
+  pickVideo(r.path);
+};
+
+let mode = 'interval';
+document.querySelectorAll('#modetabs button').forEach(b=>{
+  b.onclick = () => {
+    mode = b.dataset.mode;
+    document.querySelectorAll('#modetabs button').forEach(x=>x.classList.toggle('on', x===b));
+    ['interval','count','fps','iframe'].forEach(m=>
+      $('m-'+m).classList.toggle('hide', m !== mode));
+    estimate();
+  };
+});
+
+function exOpts(){
+  const startBy = {interval:'startSec', fps:'fpsStartSec', iframe:'iframeStartSec'};
+  return {
+    path: curVideo ? curVideo.path : '',
+    mode,
+    interval_sec: +$('intervalSec').value || 1,
+    frame_count: +$('frameCount').value || 12,
+    include_ends: $('includeEnds').value === '1',
+    extract_fps: +$('extractFps').value || 1,
+    min_gap: +$('iframeMinGap').value || 0,
+    start_sec: +$(startBy[mode] || 'startSec').value || 0,
+    end_sec: $('endSec').value === '' ? 0 : (+$('endSec').value || 0),
+    fmt: $('outFormat').value,
+    quality: +$('outQuality').value || 0.92,
+    max_side: +$('maxSide').value || 0,
+    prefix: $('namePrefix').value.trim() || 'frame',
+    tonemap: $('tonemap').checked,
+    clean: $('cleanOld').checked
+  };
+}
+
+let estTimer;
+function estimate(){
+  clearTimeout(estTimer);
+  estTimer = setTimeout(doEstimate, 350);
+}
+async function doEstimate(){
+  if(!curVideo) return;
+  $('est').textContent = '计算中…';
+  const r = await post('/api/plan', exOpts());
+  if(!r.ok){ $('est').textContent = r.error || ''; return; }
+  const HOW = {pass:'整段解码', seek:'逐点定位', keyframe:'只解关键帧'};
+  let s = `预计 <b>${r.count}</b> 帧`;
+  if(r.iframe_total != null) s += `（容器共 ${r.iframe_total} 个 I 帧）`;
+  if(r.eta) s += ` · ${HOW[r.strategy]||''}，约需 <b>${fmtEta(r.eta)}</b>`;
+  if(r.capped) s += ' · 已达 5000 帧上限';
+  $('est').innerHTML = s;
+}
+['intervalSec','startSec','frameCount','includeEnds','extractFps','fpsStartSec',
+ 'iframeMinGap','iframeStartSec','endSec'].forEach(id=>{
+  $(id).addEventListener('input', estimate);
+  $(id).addEventListener('change', estimate);
+});
+
+$('extractBtn').onclick = async () => {
+  if(!curVideo) return toast('先选一个视频');
+  $('extractBtn').disabled = true;
+  const r = await post('/api/extract', exOpts());
+  $('extractBtn').disabled = false;
+  if(!r.ok) return toast('出错：' + r.error);
+  toast('已开始抽帧');
+  refresh();
+};
+
+/* 预览：逐帧步进 + 截取当前帧 */
+const player = $('player');
+player.addEventListener('timeupdate', ()=>{
+  $('curTime').textContent = player.currentTime.toFixed(3) + 's';
+});
+function step(dir){
+  const f = curVideo && curVideo.fps ? 1/curVideo.fps : 1/30;
+  player.pause();
+  player.currentTime = Math.max(0, player.currentTime + dir*f);
+}
+$('stepBack').onclick = () => step(-1);
+$('stepFwd').onclick = () => step(1);
+$('grabNow').onclick = async () => {
+  if(!curVideo) return toast('先选一个视频');
+  const o = exOpts();
+  o.mode = 'at';
+  o.times = [player.currentTime];
+  o.clean = false;
+  o.prefix = (o.prefix || 'frame') + '_' + player.currentTime.toFixed(2).replace('.','p');
+  const r = await post('/api/extract', o);
+  if(!r.ok) return toast('出错：' + r.error);
+  toast('已截取 ' + player.currentTime.toFixed(2) + 's 这一帧');
+  refresh();
+};
+
+/* 帧预览网格 */
+let framesDir = '';
+async function showFrames(dir, quiet){
+  if(!dir) return;
+  const r = await post('/api/frames', {dir, limit: 120});
+  if(!r.ok){
+    if(!quiet) toast(r.error || '读不到帧目录');
+    $('fgrid').innerHTML = ''; $('fempty').classList.remove('hide');
+    $('fcount').textContent = ''; $('openFrames').disabled = true;
+    return;
+  }
+  framesDir = r.dir;
+  $('openFrames').disabled = false;
+  $('fcount').textContent = r.total ? `共 ${r.total} 帧` +
+    (r.total > r.frames.length ? `（只显示前 ${r.frames.length} 张）` : '') : '';
+  $('fempty').classList.toggle('hide', r.total > 0);
+  $('fgrid').innerHTML = r.frames.map(f=>
+    `<a href="/image?path=${encodeURIComponent(f.path)}" target="_blank" title="${esc(f.name)}">
+       <img loading="lazy" src="/thumb?path=${encodeURIComponent(f.path)}" alt="">
+       <span>${esc(f.name)}</span>
+     </a>`).join('');
+}
+$('openFrames').onclick = () => post('/api/reveal', {path: framesDir});
+
+/* ---------------- 任务列表 ---------------- */
+const LABEL = {queued:'排队', running:'进行中', done:'已完成', error:'失败', cancelled:'已取消'};
+const KIND = {download:'下载', extract:'抽帧'};
+
+function render(tasks){
+  const box = $('tasks');
+  if(!tasks.length){ box.innerHTML = '<div class="empty">还没有任务</div>'; return; }
+  box.innerHTML = tasks.map(t=>{
+    const pct = t.status === 'done' ? 100 : (t.percent||0);
+    const bits = [t.stage, t.speed, t.eta && ('剩余 '+t.eta), t.size].filter(Boolean);
+    let act = '';
+    if(t.status === 'queued' || t.status === 'running'){
+      act = `<button class="ghost" onclick="cancel('${t.id}')">取消</button>`;
+    } else if(t.status === 'done' && t.kind === 'extract'){
+      act = `<button class="ghost" onclick="openFrom('${esc(t.frames_dir)}')">查看帧</button>`;
+    } else if(t.status === 'done' && t.kind === 'download'){
+      act = `<button class="ghost" onclick="extractFrom('${esc(t.file)}')">去抽帧</button>`
+          + (t.file ? `<button class="ghost" onclick="reveal('${esc(t.file)}')">在 Finder 显示</button>` : '');
+    }
+    return `<div class="task ${t.status}">
+      <div class="t">
+        <div class="name"><span class="kind">${KIND[t.kind]||''}</span>${esc(t.title)}</div>
+        <div class="row" style="gap:8px">
+          <span class="st ${t.status}">${LABEL[t.status]||t.status}</span>${act}
+        </div>
+      </div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="info">${bits.map(esc).join(' · ')}</div>
+      ${t.error ? `<div class="err">${esc(t.error)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+window.cancel = id => post('/api/cancel', {id}).then(refresh);
+window.reveal = p => post('/api/reveal', {path:p});
+window.extractFrom = p => { if(p) gotoExtract(p); else toast('这个任务没有单一文件（可能是播放列表）'); };
+window.openFrom = d => {
+  document.querySelector('.tabs button[data-tab=extract]').click();
+  showFrames(d);
+  $('fgrid').scrollIntoView({behavior:'smooth', block:'center'});
+};
+
+let fails = 0, lastDone = '';
+async function refresh(){
+  try{
+    const r = await (await fetch('/api/state')).json();
+    render(r.tasks);
+    if(!$('dir').value) $('dir').value = r.output_dir;
+    $('ver').textContent = 'yt-dlp ' + r.ytdlp + ' · ffmpeg ' + (r.ffmpeg ? '内置可用' : '缺失');
+    fails = 0;
+    // 抽帧任务刚完成时自动刷新帧网格
+    const doneEx = r.tasks.filter(t=>t.kind==='extract' && t.status==='done')
+                          .map(t=>t.id + ':' + t.frame_count).join(',');
+    if(doneEx && doneEx !== lastDone){
+      lastDone = doneEx;
+      const top = r.tasks.find(t=>t.kind==='extract' && t.status==='done');
+      if(top && top.frames_dir) showFrames(top.frames_dir, true);
+    }
+  }catch(e){
+    if(++fails >= 4){
+      clearInterval(window.__poll);
+      $('ver').textContent = '服务已停止，请重新运行「启动下载器」';
+    }
+  }
+}
+refresh();
+window.__poll = setInterval(refresh, 900);
+
+$('urls').addEventListener('keydown', e=>{
+  if((e.metaKey||e.ctrlKey) && e.key === 'Enter') $('go').click();
+});
+</script>
+</body>
+</html>
